@@ -24,7 +24,7 @@ const client = mqtt.connect(config.mqtt.connectionUri, {
     topic: availabilityTopic,
     payload: "offline",
     qos: 1,
-    retain: true
+    retain: false
   }
 });
 
@@ -64,7 +64,7 @@ const checkAndPublishContainerMessages = async (): Promise<void> => {
 
           // Iterate over each topic and publish an empty message
           topics.forEach((topic: any) => {
-            HomeassistantService.publishMessage(client, topic.topic, "", { retain: true, qos: 0 });
+            HomeassistantService.publishMessage(client, topic.topic, "", { retain: false, qos: 0 });
           });
 
           // Remove the container and its associated topics from the database
