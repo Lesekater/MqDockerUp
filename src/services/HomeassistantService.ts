@@ -341,7 +341,7 @@ export default class HomeassistantService {
    * @param payload The payload to publish
    * @param configObject The config object
    */
-  public static async publishMessage(client: any, topic: string, payload: object | string, configObject: object = {}) {
+  public static async publishMessage(client: any, topic: string, payload: object | string, configObject: object) {
     if (typeof payload != "string") {
       payload = JSON.stringify(payload);
     }
