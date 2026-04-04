@@ -14,6 +14,33 @@ const suggestedArea = config.mqtt?.suggestedArea ?? "Docker";
 export default class HomeassistantService {
 
   /**
+   * Builds a release URL based on the source repository and release version
+   * @param sourceRepo The source repository URL
+   * @param releaseVersion The release version
+   * @param fallbackUrl The fallback URL to return if the source repository is not provided or an error occurs
+   */
+  public static buildReleaseUrl(sourceRepo: string | null, releaseVersion: string | null, fallbackUrl: string): string {
+    if (!sourceRepo) {
+      return fallbackUrl;
+    }
+
+    try {
+      const normalizedSourceRepo = /^https?:\/\//i.test(sourceRepo) ? sourceRepo : `https://${sourceRepo}`;
+      const parsedUrl = new URL(normalizedSourceRepo);
+      const normalizedRepo = parsedUrl.toString().replace(/\/?$/, '').replace(/\.git$/, '');
+
+      // Build release URL with tag if it's a GitHub repository
+      if (parsedUrl.hostname === 'github.com' && releaseVersion) {
+        return `${normalizedRepo}/releases/tag/${encodeURIComponent(releaseVersion)}`;
+      }
+
+      return normalizedRepo;
+    } catch (error) {
+      return fallbackUrl;
+    }
+  }
+
+  /**
    * Published availability message to the MQTT broker to indicate if the service is online or offline
    * @param client The MQTT client
    * @param online Indicates if the service is online or offline
@@ -556,6 +583,12 @@ export default class HomeassistantService {
       // Update entity payload
       const updateTopic = `${config.mqtt.topic}/${formatedImage}/update`;
       const sourceRepo = await DockerService.getSourceRepo(image, tag);
+      const releaseVersion = imageInfo?.Config?.Labels?.["org.opencontainers.image.version"] || tag;
+      const releaseUrl = HomeassistantService.buildReleaseUrl(
+        sourceRepo,
+        releaseVersion,
+        sourceRepo ? sourceRepo : "https://github.com/MichelFR/MqDockerUp"
+      );
 
       if (sourceRepo) {
         logger.info(`Found source repository: ${sourceRepo}`);
@@ -568,8 +601,8 @@ export default class HomeassistantService {
         updatePayload = {
           installed_version: `${tag}: ${currentDigest?.substring(0, 12)}`,
           latest_version: newDigest ? `${tag}: ${newDigest?.substring(0, 12)}` : null,
-          release_notes: null,
-          release_url: null,
+          release_notes: releaseUrl,
+          release_url: releaseUrl,
           entity_picture: null,
           title: `${image}:${tag}`,
           progress: 0,
@@ -597,7 +630,7 @@ export default class HomeassistantService {
           installed_version: `${tag}: ${currentDigest?.substring(0, 12)}`,
           latest_version: newDigest ? `${tag}: ${newDigest?.substring(0, 12)}` : null,
           release_summary: "",
-          release_url: `${sourceRepo ? sourceRepo : "https://github.com/MichelFR/MqDockerUp"}`,
+          release_url: releaseUrl,
           entity_picture: "https://raw.githubusercontent.com/MichelFR/MqDockerUp/refs/heads/main/assets/logo_200x200.png",
           title: `${image}:${tag}`,
           in_progress: false,
