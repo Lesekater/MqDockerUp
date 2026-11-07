@@ -237,8 +237,8 @@ export default class DockerService {
 
   /**
    * Builds the per-network endpoint configuration needed to recreate a
-   * container with all of its network attachments (static IPs, aliases,
-   * links) intact. Docker's create API only honors a single endpoint in
+   * container with all of its network attachments (static IPs, MAC
+   * addresses, aliases, links) intact. Docker's create API only honors a single endpoint in
    * NetworkingConfig, so the primary network (the one matching
    * HostConfig.NetworkMode, or the first attached network) is returned
    * separately; the rest must be reconnected after creation.
@@ -247,7 +247,7 @@ export default class DockerService {
    * @param containerId - The ID of the old container.
    */
   public static buildNetworkEndpointsConfig(
-    info: { NetworkSettings?: any; HostConfig?: any },
+    info: { NetworkSettings?: any; HostConfig?: any; Config?: any },
     containerId: string
   ): { endpointsConfig: Record<string, any>; primaryNetwork?: string } {
     const oldShortId = containerId.substring(0, 12);
@@ -259,6 +259,10 @@ export default class DockerService {
         // Docker adds the container's short ID as an implicit alias;
         // drop it so the new container gets its own.
         Aliases: (endpoint.Aliases ?? []).filter((alias: string) => alias !== oldShortId),
+        // Keep the MAC address so the container stays recognizable to
+        // firewalls, DHCP reservations and ACLs (e.g. compose `mac_address`).
+        // Honored by Docker API >= 1.44 on create and network connect.
+        MacAddress: endpoint.MacAddress || undefined,
       };
     }
 
@@ -266,6 +270,15 @@ export default class DockerService {
     const primaryNetwork = networkMode && endpointsConfig[networkMode]
       ? networkMode
       : Object.keys(endpointsConfig)[0];
+
+    // A container-wide MAC (the legacy Config.MacAddress, which is passed
+    // through on recreate) applies to the primary network. Docker rejects a
+    // create where it differs from the primary endpoint's MAC, so make them
+    // agree.
+    const legacyMac = info.Config?.MacAddress;
+    if (legacyMac && primaryNetwork) {
+      endpointsConfig[primaryNetwork].MacAddress = legacyMac;
+    }
 
     return { endpointsConfig, primaryNetwork };
   }

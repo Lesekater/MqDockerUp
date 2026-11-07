@@ -40,6 +40,43 @@ describe("DockerService.buildNetworkEndpointsConfig", () => {
     expect(endpointsConfig.proxy.Aliases).toEqual(["webserver"]);
   });
 
+  test("preserves the MAC address of every network", () => {
+    const info = {
+      HostConfig: { NetworkMode: "lan" },
+      NetworkSettings: {
+        Networks: {
+          lan: { MacAddress: "02:42:ac:11:00:aa", Aliases: [] },
+          backend: { MacAddress: "02:42:ac:12:00:bb", Aliases: [] },
+          nomac: { MacAddress: "", Aliases: [] },
+        },
+      },
+    };
+
+    const { endpointsConfig } = DockerService.buildNetworkEndpointsConfig(info, CONTAINER_ID);
+
+    expect(endpointsConfig.lan.MacAddress).toBe("02:42:ac:11:00:aa");
+    expect(endpointsConfig.backend.MacAddress).toBe("02:42:ac:12:00:bb");
+    expect(endpointsConfig.nomac.MacAddress).toBeUndefined();
+  });
+
+  test("container-wide Config.MacAddress wins on the primary network only", () => {
+    const info = {
+      Config: { MacAddress: "02:00:00:00:00:01" },
+      HostConfig: { NetworkMode: "lan" },
+      NetworkSettings: {
+        Networks: {
+          lan: { MacAddress: "02:42:ac:11:00:aa" },
+          backend: { MacAddress: "02:42:ac:12:00:bb" },
+        },
+      },
+    };
+
+    const { endpointsConfig } = DockerService.buildNetworkEndpointsConfig(info, CONTAINER_ID);
+
+    expect(endpointsConfig.lan.MacAddress).toBe("02:00:00:00:00:01");
+    expect(endpointsConfig.backend.MacAddress).toBe("02:42:ac:12:00:bb");
+  });
+
   test("drops the old container's implicit short-ID alias", () => {
     const info = {
       HostConfig: { NetworkMode: "bridge" },
