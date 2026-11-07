@@ -269,8 +269,8 @@ export default class DockerService {
       ? networkMode
       : Object.keys(endpointsConfig)[0];
 
-    // Docker rejects a create where the legacy Config.MacAddress differs
-    // from the primary network's MAC, so the legacy value wins there.
+    // Docker rejects a create where the deprecated container-wide MAC
+    // (Config.MacAddress) differs from the primary network's, so copy it over.
     const legacyMac = info.Config?.MacAddress;
     if (legacyMac && primaryNetwork) {
       endpointsConfig[primaryNetwork].MacAddress = legacyMac;

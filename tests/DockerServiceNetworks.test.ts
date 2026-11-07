@@ -59,7 +59,7 @@ describe("DockerService.buildNetworkEndpointsConfig", () => {
     expect(endpointsConfig.nomac.MacAddress).toBeUndefined();
   });
 
-  test("container-wide Config.MacAddress wins on the primary network only", () => {
+  test("copies the deprecated container-wide MAC (Config.MacAddress) onto the primary network only", () => {
     const info = {
       Config: { MacAddress: "02:00:00:00:00:01" },
       HostConfig: { NetworkMode: "lan" },
